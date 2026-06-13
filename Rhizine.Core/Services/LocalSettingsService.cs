@@ -1,65 +1,58 @@
 ﻿using Microsoft.Extensions.Options;
 using Rhizine.Core.Models;
 using Rhizine.Core.Services.Interfaces;
-using System.Collections.Concurrent;
 using System.Text.Json;
 
 namespace Rhizine.Core.Services;
 
 /// <summary>
-/// Service for managing local settings in a JSON file.
+/// Provides services for managing local application settings, including reading from and saving to a local JSON settings file.
+/// This service integrates file handling, logging, and caching mechanisms to manage settings efficiently.
 /// </summary>
 /// <remarks>
 /// This class provides functionalities to read from and save settings to a local JSON file.
 /// It uses <see cref="IFileService"/> for file operations and <see cref="ILoggingService"/> for logging errors.
-/// Settings are stored in a concurrent dictionary and are lazily loaded upon first use.
+/// Settings are stored in a a cache via <see cref="ICachingService"/>.
 /// </remarks>
 public class LocalSettingsService : ILocalSettingsService
 {
-    // Constants for default file paths and names.
-    private const string _defaultApplicationDataFolder = "Rhizine/ApplicationData";
+    private const string DefaultApplicationDataFolder = "App/ApplicationData";
+    private const string DefaultLocalSettingsFile = "LocalSettings.json";
 
-    private const string _defaultLocalSettingsFile = "LocalSettings.json";
-
-    // Dependencies for file operations and logging.
     private readonly IFileService _fileService;
-
     private readonly ILoggingService _loggingService;
-    private readonly LocalSettingsOptions _options;
-
-    // Paths for application data and settings file.
-    private readonly string _localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+    private readonly ICachingService _cachingService;
 
     private readonly string _applicationDataFolder;
-    private readonly string _localsettingsFile;
+    private readonly string _localSettingsFile;
 
-    private readonly ConcurrentDictionary<string, object> _settings = new ConcurrentDictionary<string, object>();
     private bool _isInitialized;
 
-    private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+    private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true
     };
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="LocalSettingsService"/> class.
+    /// Initializes a new instance of the <see cref="LocalSettingsService"/> class with specified services and configuration options.
     /// </summary>
-    /// <param name="fileService">File service for file operations.</param>
-    /// <param name="loggingService">Logging service for error logging.</param>
-    /// <param name="options">Options to customize file paths.</param>
-    public LocalSettingsService(IFileService fileService, ILoggingService loggingService, IOptions<LocalSettingsOptions> options)
+    /// <param name="fileService">Service for file operations.</param>
+    /// <param name="loggingService">Service for logging.</param>
+    /// <param name="cachingService">Service for caching settings.</param>
+    /// <param name="options">Configuration options that specify settings file paths.</param>
+    public LocalSettingsService(IFileService fileService, ILoggingService loggingService, ICachingService cachingService, IOptions<LocalSettingsOptions> options)
     {
-        _fileService = fileService;
-        _loggingService = loggingService;
-        _options = options.Value;
-
-        _applicationDataFolder = Path.Combine(_localApplicationData, _options.ApplicationDataFolder ?? _defaultApplicationDataFolder);
-        _localsettingsFile = _options.LocalSettingsFile ?? _defaultLocalSettingsFile;
+        _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService));
+        _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
+        _cachingService = cachingService ?? throw new ArgumentNullException(nameof(cachingService));
+        var localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        _applicationDataFolder = Path.Combine(localApplicationData, options.Value.ApplicationDataFolder ?? DefaultApplicationDataFolder);
+        _localSettingsFile = options.Value.LocalSettingsFile ?? DefaultLocalSettingsFile;
     }
 
     /// <summary>
-    /// Initializes the service asynchronously by loading settings from file.
+    /// Ensures the service is initialized by loading settings from the file and caching them.
     /// </summary>
     /// <remarks>
     /// This method checks if the service is already initialized to avoid redundant operations.
@@ -69,78 +62,51 @@ public class LocalSettingsService : ILocalSettingsService
     {
         if (!_isInitialized)
         {
-            var fileContents = await _fileService.ReadAsync<string>(_applicationDataFolder, _localsettingsFile);
+            var fileContents = await _fileService.ReadAsync<string>(_applicationDataFolder, _localSettingsFile);
             if (!string.IsNullOrEmpty(fileContents))
             {
-                try
+                var settings = JsonSerializer.Deserialize<Dictionary<string, object>>(fileContents, JsonOptions);
+                foreach (var setting in settings)
                 {
-                    var settings = JsonSerializer.Deserialize<IDictionary<string, object>>(fileContents, _jsonOptions);
-                    if (settings != null)
-                    {
-                        foreach (var setting in settings)
-                        {
-                            _settings[setting.Key] = setting.Value;
-                        }
-                    }
-                }
-                catch (JsonException)
-                {
-                    _loggingService.LogError($"Failed to deserialize local settings file: {_localsettingsFile}");
+                    await _cachingService.SetAsync(setting.Key, setting.Value);
                 }
             }
-
             _isInitialized = true;
         }
     }
 
     /// <summary>
-    /// Reads a setting asynchronously and deserializes it to the specified type.
+    /// Reads the specified setting from the cache. Initializes the service if not already done.
     /// </summary>
-    /// <typeparam name="T">The type to deserialize the setting to.</typeparam>
-    /// <param name="key">The key of the setting to read.</param>
-    /// <returns>The deserialized setting value or default if not found or deserialization fails.</returns>
+    /// <typeparam name="T">The type of the setting to read.</typeparam>
+    /// <param name="key">The key identifying the setting.</param>
+    /// <returns>The value of the setting if found; otherwise, null.</returns>
     public async Task<T?> ReadSettingAsync<T>(string key)
     {
         await InitializeAsync();
-
-        if (_settings.TryGetValue(key, out var obj) && obj is JsonElement element)
-        {
-            try
-            {
-                return element.Deserialize<T>(_jsonOptions);
-            }
-            catch (JsonException)
-            {
-                _loggingService.LogError($"Failed to deserialize local setting: {key}");
-                return default;
-            }
-        }
-
-        return default;
+        return await _cachingService.GetAsync<T>(key);
     }
 
     /// <summary>
-    /// Saves a setting asynchronously by serializing and writing it to the settings file.
+    /// Saves the specified setting by updating the local settings file and caching the value. Initializes the service if not already done.
     /// </summary>
     /// <typeparam name="T">The type of the setting to save.</typeparam>
-    /// <param name="key">The key of the setting to save.</param>
-    /// <param name="value">The setting value to save.</param>
+    /// <param name="key">The key identifying the setting.</param>
+    /// <param name="value">The value of the setting to save.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
     public async Task SaveSettingAsync<T>(string key, T value)
     {
         if (string.IsNullOrWhiteSpace(key))
-        {
             throw new ArgumentException("Key cannot be null or whitespace.", nameof(key));
-        }
-        if (value is null)
-        {
-            throw new ArgumentNullException(nameof(value));
-        }
 
         await InitializeAsync();
 
-        _settings[key] = value;
+        // Update the setting in the JSON file
+        var settings = new Dictionary<string, object> { { key, value } };
+        var serializedSettings = JsonSerializer.Serialize(settings, JsonOptions);
+        await _fileService.SaveAsync(_applicationDataFolder, _localSettingsFile, serializedSettings);
 
-        var serializedSettings = JsonSerializer.Serialize(_settings, _jsonOptions);
-        await _fileService.SaveAsync(_applicationDataFolder, _localsettingsFile, serializedSettings);
+        // Update the cache
+        await _cachingService.SetAsync(key, value);
     }
 }

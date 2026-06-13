@@ -59,10 +59,17 @@ public partial class App : Application
         };
         */
         // Configure Serilog
+
         Log.Logger = new LoggerConfiguration()
+            .WriteTo.OpenObserve(
+                    "http://localhost:5080",
+                    "Test",
+                    "root@example.com",
+                    "Complexpass#123")
             .ReadFrom.Configuration(new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json")
                 .Build())
+            
             .CreateLogger();
 
         var appLocation = Path.GetDirectoryName(Assembly.GetEntryAssembly()?.Location);

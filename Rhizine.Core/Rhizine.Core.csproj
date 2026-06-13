@@ -25,12 +25,14 @@
 
   <ItemGroup>
     <Compile Remove="Helpers\ToastNotificationActivationHandler.cs" />
+    <Compile Remove="Services\EncryptionService.cs" />
     <Compile Remove="Services\IdentityService.cs" />
     <Compile Remove="Services\Interfaces\IPopupService.cs" />
     <Compile Remove="Services\Interfaces\ISystemService.cs" />
     <Compile Remove="Services\NavigationService.cs" />
     <Compile Remove="Services\PersistAndRestoreService.cs" />
     <Compile Remove="Services\PopupService.cs" />
+    <Compile Remove="Services\ResilientDataService.cs" />
     <Compile Remove="Services\SystemService.cs" />
     <Compile Remove="ViewModels\ShellDialogViewModel.cs" />
     <Compile Remove="ViewModels\ShellViewModel.cs" />
@@ -39,9 +41,11 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.4" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.1" />
+    <PackageReference Include="System.Net.Http" Version="4.3.4" />
   </ItemGroup>
 
 </Project>
