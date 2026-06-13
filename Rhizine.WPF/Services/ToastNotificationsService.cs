@@ -12,7 +12,7 @@ public partial class ToastNotificationsService : IToastNotificationsService
 
     public void ShowToastNotification(ToastNotification toastNotification)
     {
-        ToastNotificationManagerCompat.CreateToastNotifier().Show(toastNotification);
+        //ToastNotificationManagerCompat.CreateToastNotifier().Show(toastNotification);
     }
 
     /*

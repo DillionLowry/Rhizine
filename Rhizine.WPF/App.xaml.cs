@@ -61,11 +61,6 @@ public partial class App : Application
         // Configure Serilog
 
         Log.Logger = new LoggerConfiguration()
-            .WriteTo.OpenObserve(
-                    "http://localhost:5080",
-                    "Test",
-                    "root@example.com",
-                    "Complexpass#123")
             .ReadFrom.Configuration(new ConfigurationBuilder()
                 .AddJsonFile("appsettings.json")
                 .Build())
@@ -138,6 +133,9 @@ public partial class App : Application
 
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<SettingsPage>();
+
+        services.AddTransient<MarkdownViewModel>();
+        services.AddTransient<MarkdownViewerPage>();
 
         services.AddTransient<IShellDialogWindow, ShellDialogWindow>();
         services.AddTransient<ShellDialogViewModel>();

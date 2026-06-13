@@ -84,6 +84,7 @@ public class ApplicationHostService(IServiceProvider serviceProvider, IEnumerabl
         _pageService.Register<ContentGridDetailViewModel, ContentGridDetailPage>();
         _pageService.Register<ListDetailsViewModel, ListDetailsPage>();
         _pageService.Register<SettingsViewModel, SettingsPage>();
+        _pageService.Register<MarkdownViewModel, MarkdownViewerPage>();
     }
 
     private void Startup()

@@ -61,6 +61,7 @@ public partial class ShellViewModel : BaseViewModel
         new HamburgerMenuGlyphItem() { Label = Resources.ShellDataGridPage, Glyph = "\uE8A5", TargetPageType = typeof(DataGridViewModel) },
         new HamburgerMenuGlyphItem() { Label = Resources.ShellContentGridPage, Glyph = "\uE8A5", TargetPageType = typeof(ContentGridViewModel) },
         new HamburgerMenuGlyphItem() { Label = Resources.ShellListDetailsPage, Glyph = "\uE8A5", TargetPageType = typeof(ListDetailsViewModel) },
+        new HamburgerMenuGlyphItem() { Label = "Markdown", Glyph = "\uE8A5", TargetPageType = typeof(MarkdownViewModel) },
     ];
 
     public ObservableCollection<HamburgerMenuItem> OptionMenuItems { get; } =
